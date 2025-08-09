@@ -1,0 +1,2 @@
+async function fetchDreams(){const r=await fetch(`${process.env.NEXT_PUBLIC_BASE_URL||''}/api/dreams`,{cache:'no-store'});const j=await r.json();return j.data||[];}
+export default async function DreamsPage(){const data=await fetchDreams();return(<main><h2>Dream Logs</h2><a href="/dreams/new">+ New</a><ul>{data.map((d:any)=>(<li key={d.id}><strong>{d.dream_date}</strong> — {d.summary||'(no summary)'} {d.lucid_mode?` [lucid=${d.lucid_mode}]`:''}</li>))}</ul></main>);}

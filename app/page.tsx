@@ -1,0 +1,1 @@
+export default function Page(){return(<main><h1>Shadow Dream Log</h1><p>บันทึกฝัน ค้นหา trigger และนัดพบ Shadow</p></main>)}

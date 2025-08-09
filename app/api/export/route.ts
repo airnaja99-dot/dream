@@ -1,0 +1,14 @@
+import { NextResponse } from 'next/server';import { supabase } from '@/lib/supabase';import jwt from 'jsonwebtoken';
+function getUID(req: Request){const cookie=req.headers.get('cookie')||'';const m=cookie.match(/session=([^;]+)/);if(!m)return null;try{return (jwt.verify(decodeURIComponent(m[1]),process.env.JWT_SECRET!) as any).uid;}catch{return null;}}
+function toCsvRow(fields: string[]){return fields.map(f=>{if(f==null)return'';const s=String(f);if(/[",\n]/.test(s)){return '"'+s.replace(/"/g,'""')+'"';}return s;}).join(',')+'\n';}
+export async function GET(req: Request){const uid=getUID(req);if(!uid)return new NextResponse('unauthorized',{status:401});
+const { data: logs, error } = await supabase.from('dream_logs').select(`id,dream_date,wake_time,summary,narrative,vivid_score,scene_stability,energy_after,lucid_mode,stabilise_method,shadow_signal,outcome_insight,micro_action,location_id,control_type_id,intent_mode_id,portal_id,emotion_during_id,emotion_after_id`).eq('user_id',uid).order('dream_date',{ascending:false});
+if(error) return new NextResponse(error.message,{status:400});
+async function mapTable(table:string){const {data,error}=await supabase.from(table).select('id,name');if(error||!data)return{};const m:any={};for(const r of data)m[r.id]=r.name;return m;}
+const locMap=await mapTable('locations');const ctMap=await mapTable('control_types');const imMap=await mapTable('intent_modes');const pMap=await mapTable('portals');const fMap=await mapTable('feelings');const eaMap=await mapTable('emotions_after');
+const ids=(logs||[]).map((d:any)=>d.id);let trigMap:any={};
+if(ids.length){const {data:dlt}=await supabase.from('dream_log_triggers').select('dream_log_id,trigger_id');const {data:tr}=await supabase.from('triggers').select('id,name');const nameMap:any={};(tr||[]).forEach((t:any)=>nameMap[t.id]=t.name);
+(dlt||[]).forEach((row:any)=>{const k=row.dream_log_id;trigMap[k]=trigMap[k]||[];const nm=nameMap[row.trigger_id];if(nm)trigMap[k].push(nm);});}
+const headers=['dream_date','wake_time','summary','location','vivid_score','scene_stability','energy_after','lucid_mode','control_type','intent_mode','portal','stabilise_method','shadow_signal','outcome_insight','micro_action','emotion_during','emotion_after','triggers'];let csv=toCsvRow(headers);
+for(const d of (logs||[])){const row=[d.dream_date??'',d.wake_time??'',d.summary??'',locMap[d.location_id]||'',d.vivid_score??'',d.scene_stability??'',d.energy_after??'',d.lucid_mode??'',ctMap[d.control_type_id]||'',imMap[d.intent_mode_id]||'',pMap[d.portal_id]||'',d.stabilise_method??'',d.shadow_signal??'',d.outcome_insight??'',d.micro_action??'',fMap[d.emotion_during_id]||'',eaMap[d.emotion_after_id]||'',(trigMap[d.id]?.join('|'))||''];csv+=toCsvRow(row.map(x=>x==null?'':String(x)));}
+return new NextResponse(csv,{status:200,headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="dream_logs.csv"'}});}
